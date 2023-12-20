@@ -8,13 +8,11 @@ Este es un juego 2D sandbox simple desarrollado en Java utilizando el motor de j
 
 ## Instrucciones de Ejecución (Windows)
 
-Para ejecutar el juego en macOS, sigue estos pasos:
+Para ejecutar el juego en Windows, sigue estos pasos:
 
 1. Descarga el archivo .zip del juego y descomprímelo.
 
-2. Abre la terminal y navega al directorio donde se encuentra el archivo JAR.
-
-3. Ejecuta el el fichero 'BlockGame.jar'
+2. Ejecuta el el fichero 'BlockGame.jar'
 
 ## Instrucciones de Ejecución (OSX)
 
