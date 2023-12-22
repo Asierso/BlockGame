@@ -8,23 +8,20 @@ import com.asierso.blockgame.world.Skybox;
 import com.asierso.blockgame.world.Generation;
 import com.asierso.blockgame.gameobjects.Block;
 import com.asierso.blockgame.gameobjects.Grid;
+import com.asierso.blockgame.gameobjects.Solid;
 import com.asierso.blockgame.gameobjects.ui.Inventory;
 import com.asierso.blockgame.gameobjects.ui.SplashScreen;
-import com.asierso.blockgame.misc.FlagSettings;
-import com.asierso.blockgame.misc.Global;
 import com.asierso.vortexengine.components.physics.Rigibody;
+import com.asierso.vortexengine.objects.GameObject;
 import com.asierso.vortexengine.objects.ParticleSystem;
 import com.asierso.vortexengine.window.Layer;
 import com.asierso.vortexengine.window.Scene;
 import com.asierso.vortexengine.window.Window;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.Random;
+import org.jsfml.graphics.Color;
 import org.jsfml.graphics.Image;
 import org.jsfml.system.Vector2f;
 import org.jsfml.window.Keyboard;
@@ -46,11 +43,17 @@ public class MainScene implements Scene {
     private final TextureLoader blockTilesTexture = new TextureLoader("res/tiles.png");
     private final ParticleSystem destroyBlockPS = new ParticleSystem();
     private final Block destroyBlockPSModel = new Block();
+    private final ParticleSystem precipitation = new ParticleSystem();
+    private final Random rdm = new Random();
     private boolean isAwaked = false;
     private boolean isInventoryOpened = false;
-    private boolean isMultiplayerOpened = false;
     private boolean isIconSetted = false;
     private boolean isSplashOpened = true;
+    private float precipitationClock = 0;
+    private float noPrecipitationClock = 0;
+    private boolean isPrecipitating = true;
+    private Solid[] precipitationModelTypes = new Solid[2];
+
     private int selectedId = 1;
     private float cooldown = 0f;
     private final float COOLDOWN_TIME = 0.1f;
@@ -74,6 +77,21 @@ public class MainScene implements Scene {
         destroyBlockPS.setLifetime(.1f);
         destroyBlockPS.setMaxParticles(5);
         destroyBlockPS.setModifier(ParticleSystem.ParticleModifiers.POSITION, new Vector2f(0, .5f));
+
+        //Rain particles model
+        precipitationModelTypes[0] = new Solid();
+        precipitationModelTypes[0].setBoxSize(1, 7);
+        precipitationModelTypes[0].setPosition(0, 0);
+        precipitationModelTypes[0].setRotation(-30);
+        precipitationModelTypes[0].setColor(new Color(52, 128, 235));
+
+        precipitationModelTypes[1] = new Solid();
+        precipitationModelTypes[1].setBoxSize(5, 5);
+        precipitationModelTypes[1].setPosition(0, 0);
+        precipitationModelTypes[1].setRotation(0);
+        precipitationModelTypes[1].setColor(new Color(255, 255, 235));
+
+        precipitation.setParticleModel(precipitationModelTypes[0]);
     }
 
     private void awake(Window window) {
@@ -110,7 +128,7 @@ public class MainScene implements Scene {
             awake(window);
         }
 
-        if (Mouse.isButtonPressed(Mouse.Button.LEFT) && !isInventoryOpened && !isSplashOpened && !isMultiplayerOpened) {
+        if (Mouse.isButtonPressed(Mouse.Button.LEFT) && !isInventoryOpened && !isSplashOpened) {
             var dx = Mouse.getPosition().x - window.getRender().getPosition().x;
             var dy = Mouse.getPosition().y - window.getRender().getPosition().y - 30;
             if (dx > 0 && dy > 0 && dx < window.getSize().width && dy < window.getSize().height) {
@@ -119,7 +137,7 @@ public class MainScene implements Scene {
             }
         }
 
-        if (Mouse.isButtonPressed(Mouse.Button.RIGHT) && !isInventoryOpened && !isSplashOpened && !isMultiplayerOpened) {
+        if (Mouse.isButtonPressed(Mouse.Button.RIGHT) && !isInventoryOpened && !isSplashOpened) {
             var dx = Mouse.getPosition().x - window.getRender().getPosition().x;
             var dy = Mouse.getPosition().y - window.getRender().getPosition().y - 30;
             if (dx > 0 && dy > 0 && dx < window.getSize().width && dy < window.getSize().height) {
@@ -144,6 +162,51 @@ public class MainScene implements Scene {
         grid.setBoxSize(window.getSize().width, window.getSize().height);
         grid.instantiate(window);
 
+        //Rain calculations
+        if (rdm.nextInt(0, 7830549) == 0) {
+            precipitationClock = rdm.nextInt(250, 42067);
+        }
+
+        //Rain system calculation
+        precipitation.setBoxSize(window.getSize().width * 2, 1);
+        precipitation.setPosition(-(window.getSize().width / 2), 0);
+        precipitation.instantiate(window);
+        if (isPrecipitating) {
+            if (precipitationClock > 0) {
+                precipitationClock -= .1f;
+            }
+        } else if (noPrecipitationClock > 0) {
+            noPrecipitationClock -= .1f;
+        }
+
+        if (noPrecipitationClock <= 0 && !isPrecipitating) {
+            isPrecipitating = true;
+            int rtype = rdm.nextInt(0, precipitationModelTypes.length);
+            precipitation.setParticleModel(precipitationModelTypes[rtype]);
+            switch (rtype) {
+                case 0 -> {
+                    //Rain
+                    precipitation.setModifier(ParticleSystem.ParticleModifiers.POSITION, new Vector2f(2, 2));
+                    precipitation.setLifetime(5f);
+                    precipitation.setMaxParticles(500);
+                }
+                case 1 -> {
+                    //Snow
+                    precipitation.setModifier(ParticleSystem.ParticleModifiers.POSITION, new Vector2f(0, 1));
+                    precipitation.setModifier(ParticleSystem.ParticleModifiers.BOX_SIZE, new Vector2f(-0.0025f, -0.0025f));//28
+                    precipitation.setLifetime(10f);
+                    precipitation.setMaxParticles(1000);
+                }
+            }
+            precipitation.start();
+            precipitationClock = rdm.nextInt(200, 1000);
+        }
+        if (precipitationClock <= 0 && isPrecipitating) {
+            isPrecipitating = false;
+            precipitation.stop();
+            noPrecipitationClock = rdm.nextInt(200, 1000);
+        }
+
         //Render blocks and entities
         blocks.instantiate(window);
         entities.instantiate(window);
@@ -159,6 +222,8 @@ public class MainScene implements Scene {
         }
 
         destroyBlockPS.instantiate(window);
+
+        //Window title and framerate
         window.setFrameRate(120);
         window.setTitle("BlockGame - " + (int) window.getFramesPerSecond() + " fps");
     }
@@ -168,27 +233,10 @@ public class MainScene implements Scene {
         System.exit(0);
     }
 
-    private void loadHosts() {
-        Path path = Paths.get("hosts.txt");
-        try {
-            byte[] bytes = Files.readAllBytes(path);
-            List<String> allLines = Files.readAllLines(path, StandardCharsets.UTF_8);
-            for(String host : allLines){
-                Global.flags.add(new FlagSettings("host_" + host.trim(),false,"Host " + host.trim()));
-            }
-        } catch (Exception e) {
-            
-        }
-    }
-
     private void keyboardEvents() {
         //Scene functions
-        if (Keyboard.isKeyPressed(Keyboard.Key.E) && cooldown <= 0 && !isSplashOpened && !isMultiplayerOpened) {
+        if (Keyboard.isKeyPressed(Keyboard.Key.E) && cooldown <= 0 && !isSplashOpened) {
             isInventoryOpened = !isInventoryOpened;
-            cooldown = COOLDOWN_TIME;
-        }
-        if (Keyboard.isKeyPressed(Keyboard.Key.M) && cooldown <= 0 && !isSplashOpened && !isInventoryOpened) {
-            isMultiplayerOpened = !isMultiplayerOpened;
             cooldown = COOLDOWN_TIME;
         }
         if (Keyboard.isKeyPressed(Keyboard.Key.R) && cooldown <= 0) {
@@ -199,6 +247,20 @@ public class MainScene implements Scene {
             isInventoryOpened = false;
             isSplashOpened = false;
             cooldown = COOLDOWN_TIME;
+        }
+        if (Keyboard.isKeyPressed(Keyboard.Key.S)) {
+            StringBuilder export = new StringBuilder();
+            for (GameObject b : blocks) {
+                export.append(((Block) b).getId()).append(";");
+            }
+            export.deleteCharAt(export.length() - 1);
+            try {
+                FileWriter fw = new FileWriter("tmporal.bgw");
+                fw.write(export.toString());
+                fw.close();
+            } catch (IOException ignore) {
+
+            }
         }
 
         if (cooldown > 0f) {
